@@ -20,8 +20,16 @@ AdafruitIO_Feed *humidity = io.feed("env.humidity");
 AdafruitIO_Feed *battery = io.feed("env.battery");
 AdafruitIO_Feed *raw_battery = io.feed("env.raw-battery");
 
+AdafruitIO_Feed *sample_rate = io.feed("env.samplerate");
+
 // use the Si7021 sensor to check the temp and humidity
 Adafruit_Si7021 sensor = Adafruit_Si7021();
+
+
+#define DEFAULT_WAIT_DELAY 5000
+
+unsigned long lastUpdate = 0;
+unsigned int wait_delay = DEFAULT_WAIT_DELAY;
 
 void setup() {
   // start the serial connection
@@ -32,11 +40,15 @@ void setup() {
   Serial.print("Connecting to Adafruit IO");
   io.connect();
 
+  sample_rate->onMessage(handleMessage);
+  
   // wait for a connection
-  while (io.status() < AIO_CONNECTED) {
+  while (io.mqttStatus() < AIO_CONNECTED) {
     Serial.print(".");
     delay(500);
   }
+  
+  sample_rate->get();
 
   // we are connected
   Serial.println();
@@ -46,12 +58,17 @@ void setup() {
 void loop() {
   io.run();
 
-  Serial.println(battery_count);
+  //Serial.println(battery_count);
+  if (millis() > (lastUpdate + wait_delay)) {
+    
+    Serial.println(millis());
+    battery_level();
+    env_check();
 
-  battery_level();
-  env_check();
-
-  delay(30000);
+    lastUpdate = millis();
+    
+    sample_rate->get();
+  }
 
 }
 
@@ -110,4 +127,34 @@ void battery_level() {
   // send battery level to AIO
   battery->save(level);
   raw_battery->save(raw);
+}
+
+
+// this function is called whenever a 'sample_rate' message
+// is received from Adafruit IO. it was attached to
+// the counter feed in the setup() function above.
+void handleMessage(AdafruitIO_Data *data) {
+
+  Serial.print("received <- ");
+  Serial.println(data->value());
+  
+  String inValue = data->value();
+  if (isValidNumber(inValue)) {
+    wait_delay = inValue.toInt() * 1000;
+  }
+  if (wait_delay < 30000) {
+    wait_delay = 30000;
+  }
+}
+
+boolean isValidNumber(String str)
+{
+   boolean isNum=false;
+   if(!(str.charAt(0) == '+' || str.charAt(0) == '-' || isDigit(str.charAt(0)))) return false;
+
+   for(byte i=1;i<str.length();i++)
+   {
+       if(!(isDigit(str.charAt(i)) || str.charAt(i) == '.')) return false;
+   }
+   return true;
 }

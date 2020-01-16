@@ -9,38 +9,41 @@
 // or ethernet clients.
 #include "config.h"
 
-/************************ Example Starts Here *******************************/
+/************************ Program Starts Here *******************************/
 
-
+// Library for temp and humidity sensor
 #include <Adafruit_Si7021.h>
 
-// set up the adafruit io feeds
-AdafruitIO_Feed *temperature = io.feed("env.temp");
-AdafruitIO_Feed *humidity = io.feed("env.humidity");
-AdafruitIO_Feed *battery = io.feed("env.battery");
-AdafruitIO_Feed *raw_battery = io.feed("env.raw-battery");
 
-AdafruitIO_Feed *sample_rate = io.feed("env.samplerate");
-
-// use the Si7021 sensor to check the temp and humidity
-Adafruit_Si7021 sensor = Adafruit_Si7021();
-
-
-#define DEFAULT_WAIT_DELAY 5000
-
-unsigned long lastUpdate = 0;
-unsigned int wait_delay = DEFAULT_WAIT_DELAY;
+// microseconds of deepsleep (60e6 == 1min)
+#define DEEPSLEEP_DURATION 60e6 * 5
 
 void setup() {
   // start the serial connection
   Serial.begin(115200);
 
-  // connect to io.adafruit.com
+  connectAdaIO();
+
+  runAdaIO();
+
+  // let's go back to sleep for DEEPSLEEP_DURATION seconds...
+  Serial.println("sleeping...");
+  // Put the Huzzah into deepsleep for DEEPSLEEP_DURATION
+  // NOTE: Make sure Pin 16 is connected to RST
+  ESP.deepSleep(DEEPSLEEP_DURATION);
+}
+
+// NOOP
+void loop() {
+} 
+
+void connectAdaIO() {
+    // connect to io.adafruit.com
   Serial.println();
-  Serial.print("Connecting to Adafruit IO");
+  Serial.println("Connecting to Adafruit IO...");
   io.connect();
 
-  sample_rate->onMessage(handleMessage);
+  //sample_rate->onMessage(handleMessage);
   
   // wait for a connection
   while (io.mqttStatus() < AIO_CONNECTED) {
@@ -48,32 +51,29 @@ void setup() {
     delay(500);
   }
   
-  sample_rate->get();
+  //sample_rate->get();
 
   // we are connected
-  Serial.println();
   Serial.println(io.statusText());
 }
 
-void loop() {
+void runAdaIO() {
+  Serial.println("sending value to feeds...");
+  
+  battery_level();
+  env_check();
+    
   io.run();
-
-  //Serial.println(battery_count);
-  if (millis() > (lastUpdate + wait_delay)) {
-    
-    Serial.println(millis());
-    battery_level();
-    env_check();
-
-    lastUpdate = millis();
-    
-    sample_rate->get();
-  }
-
 }
 
-
 void env_check() {
+  // set up io.adafruit.com feeds (See adafruit docs for libraries required)
+  AdafruitIO_Feed *temperature = io.feed("env.temp");
+  AdafruitIO_Feed *humidity = io.feed("env.humidity");
+  
+  // use the Si7021 sensor to check the temp and humidity
+  Adafruit_Si7021 sensor = Adafruit_Si7021();
+  
   if (!sensor.begin()) {
     Serial.println("Did not find Si7021 sensor!");
     return;
@@ -93,7 +93,6 @@ void env_check() {
 
   temperature->save(fahrenheit);
   humidity->save(relative_humidity);
-
 }
 
 void battery_level() {
@@ -111,6 +110,10 @@ void battery_level() {
   int raw = analogRead(A0);
   int level = 0;
 
+  // set up io.adafruit.com feeds (See adafruit docs for libraries required)
+  AdafruitIO_Feed *battery = io.feed("env.battery");
+  AdafruitIO_Feed *raw_battery = io.feed("env.raw-battery");
+
   Serial.print("Raw Battery: ");
   Serial.println(raw);
   if (raw > 0 && raw < 1024) {
@@ -127,34 +130,4 @@ void battery_level() {
   // send battery level to AIO
   battery->save(level);
   raw_battery->save(raw);
-}
-
-
-// this function is called whenever a 'sample_rate' message
-// is received from Adafruit IO. it was attached to
-// the counter feed in the setup() function above.
-void handleMessage(AdafruitIO_Data *data) {
-
-  Serial.print("received <- ");
-  Serial.println(data->value());
-  
-  String inValue = data->value();
-  if (isValidNumber(inValue)) {
-    wait_delay = inValue.toInt() * 1000;
-  }
-  if (wait_delay < 30000) {
-    wait_delay = 30000;
-  }
-}
-
-boolean isValidNumber(String str)
-{
-   boolean isNum=false;
-   if(!(str.charAt(0) == '+' || str.charAt(0) == '-' || isDigit(str.charAt(0)))) return false;
-
-   for(byte i=1;i<str.length();i++)
-   {
-       if(!(isDigit(str.charAt(i)) || str.charAt(i) == '.')) return false;
-   }
-   return true;
 }

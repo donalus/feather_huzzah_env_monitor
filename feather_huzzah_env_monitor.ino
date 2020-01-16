@@ -116,7 +116,7 @@ void battery_level() {
   if (raw > 0 && raw < 1024) {
     // convert battery level to percent
     //level = map(level, 580, 774, 0, 100);
-    level = map(raw, 536, 717, 0, 100);
+    level = map(raw, 510, 720, 0, 100);
     Serial.print("Battery level: ");
     Serial.print(level);
     Serial.println("%");

@@ -15,9 +15,6 @@
 #include <Adafruit_Si7021.h>
 
 
-// microseconds of deepsleep (60e6 == 1min)
-#define DEEPSLEEP_DURATION 60e6 * 5
-
 void setup() {
   // start the serial connection
   Serial.begin(115200);

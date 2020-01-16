@@ -23,8 +23,5 @@ AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, WIFI_SSID, WIFI_PASS);
 
 /*************************** POWER MANAGEMENT ******************************/
 
-// how often to report battery level to adafruit IO (in minutes)
-#define BATTERY_INTERVAL 5
- 
-// how long to sleep between checking the door state (in seconds)
-#define SLEEP_LENGTH 3
+// microseconds of deepsleep (60e6 == 1min)
+#define DEEPSLEEP_DURATION 60e6 * 5
